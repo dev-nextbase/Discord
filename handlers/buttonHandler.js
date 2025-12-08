@@ -33,30 +33,25 @@ async function handleButtonInteraction(interaction) {
             return;
         }
 
-        // Get task details to check team permission
+        // Get task details to check permissions
         const taskDetails = await getTaskById(taskId);
         const assignedToId = taskDetails.properties['Assigned To ID']?.rich_text[0]?.text?.content;
+        const taskTeam = taskDetails.properties['Team']?.select?.name;
 
         if (!assignedToId) {
             await interaction.editReply({ content: '❌ Task data incomplete' });
             return;
         }
 
-        // Check if clicking user has role for task's team
-        const { getUserTeamByRoles } = require('../services/teamRoleManager');
+        // Check permissions
+        const roleManager = require('../services/roleManager');
+        const isAssignedPerson = interaction.user.id === assignedToId;
+        const isTeamLead = taskTeam && roleManager.isTeamLead(interaction.user.id, taskTeam);
 
-        // Get task's team
-        const assignedMember = await interaction.guild.members.fetch(assignedToId);
-        const assignedUserRoles = assignedMember.roles.cache.map(role => role.id);
-        const taskTeam = getUserTeamByRoles(assignedUserRoles);
-
-        // Get clicking user's team
-        const clickingUserRoles = interaction.member.roles.cache.map(role => role.id);
-        const clickingUserTeam = getUserTeamByRoles(clickingUserRoles);
-
-        if (!clickingUserTeam || clickingUserTeam !== taskTeam) {
+        // Only assigned person and their team lead can change status
+        if (!isAssignedPerson && !isTeamLead) {
             await interaction.editReply({
-                content: '❌ You need the team role to interact with this task',
+                content: '❌ Only the assigned person or their team lead can change task status',
             });
             return;
         }
@@ -271,16 +266,12 @@ async function handleReassignButton(interaction, taskId) {
         const taskDetails = await getTaskById(taskId);
         const assignedToId = taskDetails.properties['Assigned To ID']?.rich_text[0]?.text?.content;
         const taskTitle = taskDetails.properties['Task']?.title[0]?.text?.content;
+        const taskTeam = taskDetails.properties['Team']?.select?.name;
 
         if (!assignedToId) {
             await interaction.editReply({ content: '❌ Task data incomplete' });
             return;
         }
-
-        // Get task's team
-        const assignedMember = await interaction.guild.members.fetch(assignedToId);
-        const assignedUserRoles = assignedMember.roles.cache.map(role => role.id);
-        const taskTeam = getUserTeamByRoles(assignedUserRoles);
 
         if (!taskTeam) {
             await interaction.editReply({ content: '❌ Could not determine task team' });
@@ -299,31 +290,39 @@ async function handleReassignButton(interaction, taskId) {
             return;
         }
 
-        // Get all members with the team role
-        const teamRoleId = getTeamRole(taskTeam);
-        if (!teamRoleId) {
-            await interaction.editReply({ content: '❌ Team role not configured' });
-            return;
-        }
+        // Get all members assigned to this team from userTeams.json
+        const { getUserTeam, getAllUsersInTeam } = require('../services/userTeamManager');
 
-        const teamRole = await interaction.guild.roles.fetch(teamRoleId);
-        const teamMembers = teamRole.members;
+        // Get all user IDs in this team
+        const teamUserIds = getAllUsersInTeam(taskTeam);
 
-        if (teamMembers.size === 0) {
+        if (!teamUserIds || teamUserIds.length === 0) {
             await interaction.editReply({ content: '❌ No team members found' });
             return;
         }
 
-        // Create select menu with team members
+        // Fetch Discord members for these user IDs
         const { StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+        const options = [];
 
-        const options = teamMembers
-            .filter(member => !member.user.bot && member.id !== assignedToId) // Exclude bots and current assignee
-            .map(member => ({
-                label: member.user.username,
-                description: `Reassign to ${member.user.username}`,
-                value: member.id
-            }));
+        for (const userId of teamUserIds) {
+            // Skip current assignee and bots
+            if (userId === assignedToId) continue;
+
+            try {
+                const member = await interaction.guild.members.fetch(userId);
+                if (!member.user.bot) {
+                    options.push({
+                        label: member.user.username,
+                        description: `Reassign to ${member.user.username}`,
+                        value: member.id
+                    });
+                }
+            } catch (error) {
+                // Skip if user not found in guild
+                logger.warn(`Could not fetch member ${userId}`, error);
+            }
+        }
 
         if (options.length === 0) {
             await interaction.editReply({ content: '❌ No other team members available for reassignment' });

@@ -44,18 +44,34 @@ async function handleReassignSelect(interaction, taskId) {
         // Reassign task in Notion
         await reassignTask(taskId, newAssigneeName, newAssigneeId);
 
-        // Update the original task message buttons
-        const originalMessage = interaction.message;
-        if (originalMessage) {
-            const updatedButtons = createTaskButtons(taskId);
-            await originalMessage.edit({ components: [updatedButtons] });
+        // Update the original task message buttons (if Discord URL exists)
+        if (discordUrl) {
+            try {
+                // Parse Discord URL to get channel and message IDs
+                const urlParts = discordUrl.split('/');
+                const messageId = urlParts[urlParts.length - 1];
+                const channelId = urlParts[urlParts.length - 2];
+
+                const channel = await interaction.client.channels.fetch(channelId);
+                if (channel) {
+                    const message = await channel.messages.fetch(messageId);
+                    if (message) {
+                        const updatedButtons = createTaskButtons(taskId);
+                        await message.edit({ components: [updatedButtons] });
+                        logger.success('Updated task message buttons');
+                    }
+                }
+            } catch (error) {
+                logger.warn('Failed to update original task message buttons', error);
+                // Don't fail the whole operation if this fails
+            }
         }
 
         // Remove task from old assignee's personal channel
         if (oldAssigneeId) {
             try {
-                const { config } = require('../config/config');
-                const oldPersonalChannelId = config.channels.getPersonChannel(oldAssigneeId);
+                const channelManager = require('../services/channelManager');
+                const oldPersonalChannelId = channelManager.getPersonChannel(oldAssigneeId);
 
                 if (oldPersonalChannelId) {
                     const oldPersonalChannel = await interaction.client.channels.fetch(oldPersonalChannelId);
@@ -75,12 +91,14 @@ async function handleReassignSelect(interaction, taskId) {
                 }
             } catch (error) {
                 logger.warn('Failed to remove task from old assignee channel', error);
+                // Don't fail the whole operation if this fails
             }
         }
 
-        // Send task to new assignee's personal channel
+        // Send task to new assignee's personal channel (if configured)
         const { config } = require('../config/config');
-        const newPersonalChannelId = config.channels.getPersonChannel(newAssigneeId);
+        const channelManager = require('../services/channelManager');
+        const newPersonalChannelId = channelManager.getPersonChannel(newAssigneeId);
 
         if (newPersonalChannelId) {
             try {
@@ -125,10 +143,15 @@ async function handleReassignSelect(interaction, taskId) {
                     });
 
                     logger.success(`Sent reassigned task to new assignee's channel`);
+                } else {
+                    logger.warn(`Personal channel ${newPersonalChannelId} not found for user ${newAssigneeId}`);
                 }
             } catch (error) {
                 logger.error('Failed to send task to new assignee channel', error);
+                // Don't fail the whole operation if this fails
             }
+        } else {
+            logger.info(`No personal channel configured for user ${newAssigneeId}, skipping notification`);
         }
 
         // Notify old assignee

@@ -80,9 +80,28 @@ function removeUserTeam(userId) {
     logger.success(`Removed team assignment for user: ${userId}`);
 }
 
+/**
+ * Gets all users assigned to a specific team
+ * @param {string} teamName - Team name
+ * @returns {Array} Array of user IDs in the team
+ */
+function getAllUsersInTeam(teamName) {
+    const data = loadUserTeams();
+    const userIds = [];
+
+    for (const [userId, team] of Object.entries(data.userTeams)) {
+        if (team === teamName) {
+            userIds.push(userId);
+        }
+    }
+
+    return userIds;
+}
+
 module.exports = {
     assignUserToTeam,
     getUserTeam,
     listUserTeams,
     removeUserTeam,
+    getAllUsersInTeam,
 };
