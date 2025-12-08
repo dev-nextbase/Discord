@@ -1,0 +1,446 @@
+const { Client } = require('@notionhq/client');
+const { config } = require('../config/config');
+const logger = require('../utils/logger');
+
+const notion = new Client({ auth: config.notion.token });
+
+/**
+ * Creates a new task in Notion database
+ * @param {Object} taskData - Task information
+ * @returns {Promise<Object>} Created Notion page object
+ */
+async function createTask(taskData) {
+    try {
+        const response = await notion.pages.create({
+            parent: { database_id: config.notion.databaseId },
+            properties: {
+                'Task': {
+                    title: [
+                        {
+                            text: {
+                                content: taskData.task,
+                            },
+                        },
+                    ],
+                },
+                'Assigned By': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedBy,
+                            },
+                        },
+                    ],
+                },
+                'Assigned To': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedTo,
+                            },
+                        },
+                    ],
+                },
+                'Assigned By ID': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedById || '',
+                            },
+                        },
+                    ],
+                },
+                'Assigned To ID': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedToId || '',
+                            },
+                        },
+                    ],
+                },
+                'Description': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.description || '',
+                            },
+                        },
+                    ],
+                },
+                'Team': {
+                    select: {
+                        name: taskData.team,
+                    },
+                },
+                'Priority': {
+                    select: {
+                        name: taskData.priority,
+                    },
+                },
+                'Status': {
+                    select: {
+                        name: 'On Hold',
+                    },
+                },
+            },
+        });
+
+        logger.success(`Created task in Notion: ${response.id}`);
+        return response;
+    } catch (error) {
+        logger.error('Failed to create task in Notion', error);
+        throw error;
+    }
+}
+
+/**
+ * Updates task status in Notion
+ * @param {string} pageId - Notion page ID
+ * @param {string} status - New status (On Hold, Working, Done)
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateTaskStatus(pageId, status) {
+    try {
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Status': {
+                    select: {
+                        name: status,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated task ${pageId} status to: ${status}`);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update task status: ${pageId}`, error);
+        throw error;
+    }
+}
+
+/**
+ * Updates "Started Working On" timestamp
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateWorkingTimestamp(pageId) {
+    try {
+        const now = new Date().toISOString();
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Started Working On': {
+                    date: {
+                        start: now,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated working timestamp for task: ${pageId}`);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update working timestamp: ${pageId}`, error);
+        throw error;
+    }
+}
+
+/**
+ * Updates "Done Working On" timestamp
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateDoneTimestamp(pageId) {
+    try {
+        const now = new Date().toISOString();
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Done Working On': {
+                    date: {
+                        start: now,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated done timestamp for task: ${pageId}`);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update done timestamp: ${pageId}`, error);
+        throw error;
+    }
+}
+
+/**
+ * Retrieves task details from Notion
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Page object with properties
+ */
+async function getTaskById(pageId) {
+    try {
+        const response = await notion.pages.retrieve({ page_id: pageId });
+        return response;
+        ```javascript
+const { Client } = require('@notionhq/client');
+const { config } = require('../config/config');
+const logger = require('../utils/logger');
+
+const notion = new Client({ auth: config.notion.token });
+
+/**
+ * Creates a new task in Notion database
+ * @param {Object} taskData - Task information
+ * @returns {Promise<Object>} Created Notion page object
+ */
+async function createTask(taskData) {
+    try {
+        const response = await notion.pages.create({
+            parent: { database_id: config.notion.databaseId },
+            properties: {
+                'Task': {
+                    title: [
+                        {
+                            text: {
+                                content: taskData.task,
+                            },
+                        },
+                    ],
+                },
+                'Assigned By': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedBy,
+                            },
+                        },
+                    ],
+                },
+                'Assigned To': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedTo,
+                            },
+                        },
+                    ],
+                },
+                'Assigned By ID': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedById || '',
+                            },
+                        },
+                    ],
+                },
+                'Assigned To ID': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.assignedToId || '',
+                            },
+                        },
+                    ],
+                },
+                'Description': {
+                    rich_text: [
+                        {
+                            text: {
+                                content: taskData.description || '',
+                            },
+                        },
+                    ],
+                },
+                'Team': {
+                    select: {
+                        name: taskData.team,
+                    },
+                },
+                'Priority': {
+                    select: {
+                        name: taskData.priority,
+                    },
+                },
+                'Status': {
+                    select: {
+                        name: 'On Hold',
+                    },
+                },
+            },
+        });
+
+        logger.success(`Created task in Notion: ${ response.id } `);
+        return response;
+    } catch (error) {
+        logger.error('Failed to create task in Notion', error);
+        throw error;
+    }
+}
+
+/**
+ * Updates task status in Notion
+ * @param {string} pageId - Notion page ID
+ * @param {string} status - New status (On Hold, Working, Done)
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateTaskStatus(pageId, status) {
+    try {
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Status': {
+                    select: {
+                        name: status,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated task ${ pageId } status to: ${ status } `);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update task status: ${ pageId } `, error);
+        throw error;
+    }
+}
+
+/**
+ * Updates "Started Working On" timestamp
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateWorkingTimestamp(pageId) {
+    try {
+        const now = new Date().toISOString();
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Started Working On': {
+                    date: {
+                        start: now,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated working timestamp for task: ${ pageId } `);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update working timestamp: ${ pageId } `, error);
+        throw error;
+    }
+}
+
+/**
+ * Updates "Done Working On" timestamp
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Updated page object
+ */
+async function updateDoneTimestamp(pageId) {
+    try {
+        const now = new Date().toISOString();
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Done Working On': {
+                    date: {
+                        start: now,
+                    },
+                },
+            },
+        });
+
+        logger.success(`Updated done timestamp for task: ${ pageId } `);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to update done timestamp: ${ pageId } `, error);
+        throw error;
+    }
+}
+
+/**
+ * Retrieves task details from Notion
+ * @param {string} pageId - Notion page ID
+ * @returns {Promise<Object>} Page object with properties
+ */
+async function getTaskById(pageId) {
+    try {
+        const response = await notion.pages.retrieve({ page_id: pageId });
+        return response;
+    } catch (error) {
+        logger.error(`Failed to retrieve task: ${ pageId } `, error);
+        throw error;
+    }
+}
+
+/**
+ * Gets all active tasks (Working or On Hold) for a specific user
+ * @param {string} userId - Discord user ID
+ * @returns {Promise<Array>} Array of task objects
+ */
+async function getTasksByUser(userId) {
+  try {
+    const response = await notion.databases.query({
+      database_id: config.notion.databaseId,
+      filter: {
+        and: [
+          {
+            property: 'Assigned To ID',
+            rich_text: {
+              equals: userId,
+            },
+          },
+          {
+            or: [
+              {
+                property: 'Status',
+                select: {
+                  equals: 'Working',
+                },
+              },
+              {
+                property: 'Status',
+                select: {
+                  equals: 'On Hold',
+                },
+              },
+            ],
+          },
+        ],
+      },
+      sorts: [
+        {
+          property: 'Status',
+          direction: 'ascending',
+        },
+      ],
+    });
+
+    // Format results
+    const tasks = response.results.map(page => ({
+      id: page.id,
+      title: page.properties.Task?.title[0]?.text?.content || 'Untitled',
+      status: page.properties.Status?.select?.name || 'Unknown',
+      priority: page.properties.Priority?.select?.name || 'Medium',
+    }));
+
+    return tasks;
+  } catch (error) {
+    logger.error('Error fetching tasks by user', error);
+    throw error;
+  }
+}
+
+module.exports = {
+    createTask,
+    updateTaskStatus,
+    updateWorkingTimestamp,
+    updateDoneTimestamp,
+    getTaskById,
+    getTasksByUser,
+};
+```

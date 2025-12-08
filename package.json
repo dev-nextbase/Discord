@@ -1,0 +1,19 @@
+{
+  "name": "discord-notion-task-bot",
+  "version": "1.0.0",
+  "description": "Discord bot integrated with Notion API for task management",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "deploy-commands": "node commands/deploy-commands.js"
+  },
+  "keywords": ["discord", "notion", "task-management", "bot"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@notionhq/client": "^2.2.15",
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.2"
+  }
+}
