@@ -46,9 +46,11 @@ function saveChannels(channels) {
 
 /**
  * Updates .env file with new channel mapping
+ * @deprecated No longer used - channels are now stored only in channels.json
  * @param {string} key - Environment variable key
  * @param {string} value - Channel ID value
  */
+/*
 function updateEnvFile(key, value) {
     const envPath = path.join(__dirname, '..', '.env');
 
@@ -81,6 +83,8 @@ function updateEnvFile(key, value) {
         logger.error('Failed to update .env file', error);
     }
 }
+*/
+
 
 /**
  * Sets a team channel mapping
@@ -93,10 +97,6 @@ function setTeamChannel(teamName, channelId) {
 
     channels.teamChannels[normalizedTeamName] = channelId;
     saveChannels(channels);
-
-    // Also update .env file
-    const envKey = `TEAM_CHANNEL_${normalizedTeamName}`;
-    updateEnvFile(envKey, channelId);
 
     logger.success(`Set team channel: ${normalizedTeamName} -> ${channelId}`);
     return normalizedTeamName;
@@ -112,10 +112,6 @@ function setPersonChannel(userId, channelId) {
 
     channels.personChannels[userId] = channelId;
     saveChannels(channels);
-
-    // Also update .env file
-    const envKey = `PERSON_CHANNEL_${userId}`;
-    updateEnvFile(envKey, channelId);
 
     logger.success(`Set person channel: ${userId} -> ${channelId}`);
 }
@@ -251,10 +247,6 @@ function setTeamLogChannel(teamName, channelId) {
     channels.teamLogChannels[normalizedTeamName] = channelId;
     saveChannels(channels);
 
-    // Also update .env file
-    const envKey = `TEAM_LOG_CHANNEL_${normalizedTeamName}`;
-    updateEnvFile(envKey, channelId);
-
     logger.success(`Set team log channel: ${normalizedTeamName} -> ${channelId}`);
     return normalizedTeamName;
 }
@@ -272,9 +264,7 @@ function getTeamLogChannel(teamName) {
         return channels.teamLogChannels[normalizedTeamName];
     }
 
-    // Fallback to env
-    const envKey = `TEAM_LOG_CHANNEL_${normalizedTeamName}`;
-    return process.env[envKey] || null;
+    return null;
 }
 
 /**

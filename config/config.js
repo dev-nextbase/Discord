@@ -11,29 +11,15 @@ const config = {
     databaseId: process.env.NOTION_DATABASE_ID,
   },
   channels: {
-    // Get team channel from JSON or environment variable
+    // Get team channel from JSON
     getTeamChannel: (teamName) => {
       const channelManager = require('../services/channelManager');
-
-      // Try JSON config first
-      const jsonChannel = channelManager.getTeamChannel(teamName);
-      if (jsonChannel) return jsonChannel;
-
-      // Fallback to environment variable
-      const envKey = `TEAM_CHANNEL_${teamName.toUpperCase().replace(/\s+/g, '_')}`;
-      return process.env[envKey];
+      return channelManager.getTeamChannel(teamName);
     },
-    // Get person channel from JSON or environment variable
+    // Get person channel from JSON
     getPersonChannel: (userId) => {
       const channelManager = require('../services/channelManager');
-
-      // Try JSON config first
-      const jsonChannel = channelManager.getPersonChannel(userId);
-      if (jsonChannel) return jsonChannel;
-
-      // Fallback to environment variable
-      const envKey = `PERSON_CHANNEL_${userId}`;
-      return process.env[envKey];
+      return channelManager.getPersonChannel(userId);
     },
     // Set person channel
     setPersonChannel: (userId, channelId) => {
