@@ -274,6 +274,119 @@ async function getActiveTasksByUser() {
     }
 }
 
+async function getTaskReportByUser(userId, startDate, endDate) {
+    try {
+        logger.info(`Fetching task report for user ${userId} from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+        const response = await notion.databases.query({
+            database_id: config.notion.databaseId,
+            filter: {
+                or: [
+                    {
+                        property: 'Assigned To ID',
+                        rich_text: {
+                            equals: userId,
+                        },
+                    },
+                    {
+                        property: 'Assigned By ID',
+                        rich_text: {
+                            equals: userId,
+                        },
+                    },
+                ],
+            },
+        });
+
+        const tasks = response.results;
+
+        // Filter tasks by date range and calculate statistics
+        let completedTasks = 0;
+        let assignedTasks = 0;
+        let remainingTasks = 0;
+        let totalReceived = 0;
+        let workingTasks = 0;
+        let onHoldTasks = 0;
+
+        tasks.forEach(task => {
+            const assignedToId = task.properties['Assigned To ID']?.rich_text[0]?.text?.content;
+            const assignedById = task.properties['Assigned By ID']?.rich_text[0]?.text?.content;
+            const status = task.properties['Status']?.select?.name;
+            const doneDate = task.properties['Done Working On']?.date?.start;
+            const createdDate = new Date(task.created_time);
+
+            // Check if task was created in the date range
+            const isInDateRange = createdDate >= startDate && createdDate <= endDate;
+
+            // Tasks assigned TO this user
+            if (assignedToId === userId) {
+                totalReceived++;
+
+                if (status === 'Done') {
+                    // Check if completed in date range
+                    if (doneDate) {
+                        const completedDate = new Date(doneDate);
+                        if (completedDate >= startDate && completedDate <= endDate) {
+                            completedTasks++;
+                        }
+                    }
+                } else {
+                    // Remaining tasks (not done)
+                    remainingTasks++;
+
+                    if (status === 'Working') {
+                        workingTasks++;
+                    } else if (status === 'On Hold') {
+                        onHoldTasks++;
+                    }
+                }
+            }
+
+            // Tasks assigned BY this user (to others)
+            if (assignedById === userId && assignedToId !== userId && isInDateRange) {
+                assignedTasks++;
+            }
+        });
+
+        return {
+            completedTasks,
+            assignedTasks,
+            remainingTasks,
+            totalReceived,
+            workingTasks,
+            onHoldTasks,
+        };
+    } catch (error) {
+        logger.error('Error fetching task report', error);
+        throw error;
+    }
+}
+
+async function reassignTask(pageId, newAssignedTo, newAssignedToId) {
+    try {
+        const response = await notion.pages.update({
+            page_id: pageId,
+            properties: {
+                'Assigned To': {
+                    rich_text: [{ text: { content: newAssignedTo } }],
+                },
+                'Assigned To ID': {
+                    rich_text: [{ text: { content: newAssignedToId } }],
+                },
+                'Status': {
+                    select: { name: 'On Hold' },
+                },
+            },
+        });
+
+        logger.success(`Reassigned task ${pageId} to: ${newAssignedTo}`);
+        return response;
+    } catch (error) {
+        logger.error(`Failed to reassign task: ${pageId}`, error);
+        throw error;
+    }
+}
+
 module.exports = {
     createTask,
     updateTaskStatus,
@@ -284,4 +397,6 @@ module.exports = {
     getTasksByUser,
     getTasksByTeam,
     getActiveTasksByUser,
+    getTaskReportByUser,
+    reassignTask,
 };

@@ -104,6 +104,11 @@ client.on('interactionCreate', async interaction => {
         const { handleButtonInteraction } = require('./handlers/buttonHandler');
         await handleButtonInteraction(interaction);
     }
+
+    if (interaction.isStringSelectMenu()) {
+        const { handleSelectMenuInteraction } = require('./handlers/selectMenuHandler');
+        await handleSelectMenuInteraction(interaction);
+    }
 });
 
 client.on('error', error => {

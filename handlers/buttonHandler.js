@@ -12,6 +12,12 @@ async function handleButtonInteraction(interaction) {
         const [action, taskId] = interaction.customId.split('_');
         logger.info(`Button clicked: ${action} for task ${taskId}`);
 
+        // Handle reassign button separately
+        if (action === 'reassign') {
+            await handleReassignButton(interaction, taskId);
+            return;
+        }
+
         await interaction.deferReply({ ephemeral: true });
 
         const statusMap = {
@@ -51,6 +57,14 @@ async function handleButtonInteraction(interaction) {
         if (!clickingUserTeam || clickingUserTeam !== taskTeam) {
             await interaction.editReply({
                 content: '❌ You need the team role to interact with this task',
+            });
+            return;
+        }
+
+        // For "Done" action, only the assigned person can mark it as done
+        if (action === 'done' && interaction.user.id !== assignedToId) {
+            await interaction.editReply({
+                content: '❌ Only the assigned person can mark this task as done',
             });
             return;
         }
@@ -242,6 +256,100 @@ async function updateStatusBoard(client) {
         logger.success('Status board updated');
     } catch (error) {
         logger.warn('Failed to update status board', error);
+    }
+}
+
+async function handleReassignButton(interaction, taskId) {
+    try {
+        await interaction.deferReply({ ephemeral: true });
+
+        const roleManager = require('../services/roleManager');
+        const { getTaskById } = require('../services/notionService');
+        const { getUserTeamByRoles, getTeamRole } = require('../services/teamRoleManager');
+
+        // Get task details
+        const taskDetails = await getTaskById(taskId);
+        const assignedToId = taskDetails.properties['Assigned To ID']?.rich_text[0]?.text?.content;
+        const taskTitle = taskDetails.properties['Task']?.title[0]?.text?.content;
+
+        if (!assignedToId) {
+            await interaction.editReply({ content: '❌ Task data incomplete' });
+            return;
+        }
+
+        // Get task's team
+        const assignedMember = await interaction.guild.members.fetch(assignedToId);
+        const assignedUserRoles = assignedMember.roles.cache.map(role => role.id);
+        const taskTeam = getUserTeamByRoles(assignedUserRoles);
+
+        if (!taskTeam) {
+            await interaction.editReply({ content: '❌ Could not determine task team' });
+            return;
+        }
+
+        // Check if user is team lead or admin
+        const isTeamLead = roleManager.isTeamLead(interaction.user.id, taskTeam);
+        const isAdmin = roleManager.isAdmin(interaction.user.id);
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+
+        if (!isTeamLead && !isAdmin && !isOwner) {
+            await interaction.editReply({
+                content: '❌ Only team leads can reassign tasks',
+            });
+            return;
+        }
+
+        // Get all members with the team role
+        const teamRoleId = getTeamRole(taskTeam);
+        if (!teamRoleId) {
+            await interaction.editReply({ content: '❌ Team role not configured' });
+            return;
+        }
+
+        const teamRole = await interaction.guild.roles.fetch(teamRoleId);
+        const teamMembers = teamRole.members;
+
+        if (teamMembers.size === 0) {
+            await interaction.editReply({ content: '❌ No team members found' });
+            return;
+        }
+
+        // Create select menu with team members
+        const { StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+
+        const options = teamMembers
+            .filter(member => !member.user.bot && member.id !== assignedToId) // Exclude bots and current assignee
+            .map(member => ({
+                label: member.user.username,
+                description: `Reassign to ${member.user.username}`,
+                value: member.id
+            }));
+
+        if (options.length === 0) {
+            await interaction.editReply({ content: '❌ No other team members available for reassignment' });
+            return;
+        }
+
+        const selectMenu = new StringSelectMenuBuilder()
+            .setCustomId(`reassign_select_${taskId}`)
+            .setPlaceholder('Select a team member')
+            .addOptions(options.slice(0, 25)); // Discord limit is 25 options
+
+        const row = new ActionRowBuilder().addComponents(selectMenu);
+
+        await interaction.editReply({
+            content: `🔄 **Reassign Task:** ${taskTitle}\n\nSelect a team member to reassign this task to:`,
+            components: [row]
+        });
+
+        logger.success(`Showed reassignment menu for task ${taskId}`);
+    } catch (error) {
+        logger.error('Error handling reassign button', error);
+        try {
+            await interaction.editReply({ content: '❌ Failed to show reassignment options' });
+        } catch (replyError) {
+            logger.error('Failed to send error reply', replyError);
+        }
     }
 }
 

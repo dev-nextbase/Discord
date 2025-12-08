@@ -10,7 +10,12 @@ function createTaskButtons(taskId) {
                 .setCustomId(`working_${taskId}`)
                 .setLabel('Start Working')
                 .setStyle(ButtonStyle.Primary)
-                .setEmoji('▶️')
+                .setEmoji('▶️'),
+            new ButtonBuilder()
+                .setCustomId(`reassign_${taskId}`)
+                .setLabel('Reassign')
+                .setStyle(ButtonStyle.Secondary)
+                .setEmoji('🔄')
         );
 
     return row;
@@ -22,7 +27,7 @@ function createTaskButtons(taskId) {
 function createUpdatedButtons(taskId, currentStatus) {
     const row = new ActionRowBuilder();
 
-    // If Working, show On Hold and Done
+    // If Working, show On Hold, Done, and Reassign
     if (currentStatus === 'Working') {
         const onHoldButton = new ButtonBuilder()
             .setCustomId(`onhold_${taskId}`)
@@ -36,9 +41,15 @@ function createUpdatedButtons(taskId, currentStatus) {
             .setStyle(ButtonStyle.Success)
             .setEmoji('✅');
 
-        row.addComponents(onHoldButton, doneButton);
+        const reassignButton = new ButtonBuilder()
+            .setCustomId(`reassign_${taskId}`)
+            .setLabel('Reassign')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🔄');
+
+        row.addComponents(onHoldButton, doneButton, reassignButton);
     }
-    // If On Hold or Done, show all three
+    // If On Hold or Done, show all buttons
     else {
         const onHoldButton = new ButtonBuilder()
             .setCustomId(`onhold_${taskId}`)
@@ -61,7 +72,13 @@ function createUpdatedButtons(taskId, currentStatus) {
             .setEmoji('✅')
             .setDisabled(currentStatus === 'Done');
 
-        row.addComponents(onHoldButton, workingButton, doneButton);
+        const reassignButton = new ButtonBuilder()
+            .setCustomId(`reassign_${taskId}`)
+            .setLabel('Reassign')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('🔄');
+
+        row.addComponents(onHoldButton, workingButton, doneButton, reassignButton);
     }
 
     return row;

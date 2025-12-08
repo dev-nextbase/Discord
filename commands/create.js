@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const logger = require('../utils/logger');
+const { getPriorityChoices } = require('../utils/priorityHelper');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,13 +22,9 @@ module.exports = {
         .addStringOption(option =>
             option
                 .setName('priority')
-                .setDescription('Task priority')
+                .setDescription('Task priority (1=Minimal, 10=Critical)')
                 .setRequired(true)
-                .addChoices(
-                    { name: '🔴 High', value: '🔴 High' },
-                    { name: '🟡 Medium', value: '🟡 Medium' },
-                    { name: '🟢 Low', value: '🟢 Low' }
-                )
+                .addChoices(...getPriorityChoices())
         ),
 
     async execute(interaction) {

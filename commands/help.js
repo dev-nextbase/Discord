@@ -1,36 +1,55 @@
-const { EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const roleManager = require('../services/roleManager');
 
 module.exports = {
-    name: 'help',
-    description: 'Show help commands',
-    async execute(message, args) {
-        const subcommand = args[0]?.toLowerCase();
-        const userId = message.author.id;
+    data: new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Show help and available commands')
+        .addStringOption(option =>
+            option
+                .setName('category')
+                .setDescription('Help category to view')
+                .setRequired(false)
+                .addChoices(
+                    { name: 'General (Default)', value: 'general' },
+                    { name: 'Team Lead Commands', value: 'team' },
+                    { name: 'Admin Commands', value: 'admin' }
+                )
+        ),
 
-        if (subcommand === 'admin') {
+    async execute(interaction) {
+        const category = interaction.options.getString('category') || 'general';
+        const userId = interaction.user.id;
+
+        if (category === 'admin') {
             // Check if user is admin
-            if (!roleManager.isAdmin(userId) && message.guild.ownerId !== userId) {
-                return message.reply('❌ You do not have permission to view Admin help.');
+            if (!roleManager.isAdmin(userId) && interaction.guild.ownerId !== userId) {
+                return interaction.reply({
+                    content: '❌ You do not have permission to view Admin help.',
+                    ephemeral: true
+                });
             }
-            await sendAdminHelp(message);
-        } else if (subcommand === 'team') {
+            await sendAdminHelp(interaction);
+        } else if (category === 'team') {
             // Check if user is team lead or admin
             const isLead = roleManager.isTeamLead(userId);
             const isAdmin = roleManager.isAdmin(userId);
 
-            if (!isLead && !isAdmin && message.guild.ownerId !== userId) {
-                return message.reply('❌ You do not have permission to view Team Lead help.');
+            if (!isLead && !isAdmin && interaction.guild.ownerId !== userId) {
+                return interaction.reply({
+                    content: '❌ You do not have permission to view Team Lead help.',
+                    ephemeral: true
+                });
             }
-            await sendTeamHelp(message);
+            await sendTeamHelp(interaction);
         } else {
             // General help
-            await sendGeneralHelp(message);
+            await sendGeneralHelp(interaction);
         }
     },
 };
 
-async function sendGeneralHelp(message) {
+async function sendGeneralHelp(interaction) {
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
         .setTitle('🤖 Task Management Bot - Help Guide')
@@ -63,7 +82,7 @@ async function sendGeneralHelp(message) {
                     '• **Personal Channel Notifications**: Tasks assigned to you appear in your personal channel\n' +
                     '• **Completion Alerts**: Get notified in your channel when someone completes your task\n' +
                     '• **Task Threads**: Each task gets its own Discord thread for discussion\n' +
-                    '• **Status Buttons**: Use buttons in your team channel to update task status (Working/Done)',
+                    '• **Status Buttons**: Use buttons in your personal channel to update task status (Working/Done)',
                 inline: false
             },
             {
@@ -80,60 +99,72 @@ async function sendGeneralHelp(message) {
                     '• Click **"Go to Task"** buttons to jump directly to task threads\n' +
                     '• Use `/report` to track your productivity over time\n' +
                     '• Higher priority tasks (🔴) should be completed first\n' +
-                    '• Update task status using the Working/Done buttons in your team channel',
+                    '• Update task status using the Working/Done buttons in your personal channel',
                 inline: false
             }
         )
-        .setFooter({ text: 'For advanced commands, use ?help team (Team Leads) or ?help admin (Admins)' })
+        .setFooter({ text: 'For advanced commands, use /help category:Team Lead or /help category:Admin' })
         .setTimestamp();
 
-    await message.channel.send({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-async function sendTeamHelp(message) {
+async function sendTeamHelp(interaction) {
     const embed = new EmbedBuilder()
         .setColor('#FEE75C')
         .setTitle('👑 Bot Help - Team Lead Commands')
         .setDescription('Commands for Team Leads to manage their team:')
         .addFields(
             {
-                name: '📋 Team Tasks', value:
+                name: '📋 Team Tasks',
+                value:
                     '`?team tasks` - View all active tasks for your team\n' +
                     '`?team tasks 10` - View priority 10 (critical) team tasks\n' +
                     '`?team tasks 5` - View priority 5 (medium) team tasks\n' +
                     '`?team tasks 1` - View priority 1 (minimal) team tasks'
             },
             {
-                name: '� Task Reassignment', value:
+                name: '🔄 Task Reassignment',
+                value:
                     '**Reassign Button** - Click the 🔄 Reassign button on any task\n' +
                     '• Select a team member from the dropdown\n' +
                     '• Task is reassigned and old assignee is notified\n' +
                     '• New assignee receives the task in their channel'
             },
             {
-                name: '�🔍 User Inspection', value:
+                name: '🔍 User Inspection',
+                value:
                     '`/tasks user:@user` - View active tasks for a specific user in your team'
+            },
+            {
+                name: '📊 Status Board',
+                value:
+                    '`/status-board` - Set up a live status board showing team member activity'
             }
-        );
+        )
+        .setFooter({ text: 'Team Leads have access to all general commands plus these special commands' })
+        .setTimestamp();
 
-    await message.channel.send({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
 }
 
-async function sendAdminHelp(message) {
+async function sendAdminHelp(interaction) {
     const embed = new EmbedBuilder()
         .setColor('#ED4245')
         .setTitle('🛡️ Bot Help - Admin Commands')
         .setDescription('Full control commands for Admins:')
         .addFields(
             {
-                name: '👥 Role Management', value:
+                name: '👥 Role Management',
+                value:
                     '`?role add admin @user` - Add a new Admin\n' +
                     '`?role remove admin @user` - Remove an Admin\n' +
                     '`?role add lead @user TeamName` - Assign a Team Lead\n' +
                     '`?role remove lead @user TeamName` - Remove a Team Lead'
             },
             {
-                name: '⚙️ Team Configuration', value:
+                name: '⚙️ Team Configuration',
+                value:
                     '`?team add TeamName @Role` - Link Discord role to Team\n' +
                     '`?team channel TeamName #channel` - Set main team channel\n' +
                     '`?team log TeamName #channel` - Set completion log channel\n' +
@@ -141,11 +172,14 @@ async function sendAdminHelp(message) {
                     '`?team clear` - Reset all team configs'
             },
             {
-                name: '🔍 Global Inspection', value:
+                name: '🔍 Global Inspection',
+                value:
                     '`?team tasks [filter] [TeamName]` - View tasks for ANY team\n' +
                     '`/tasks user:@user` - View tasks for ANY user'
             }
-        );
+        )
+        .setFooter({ text: 'Admins have access to all commands in the bot' })
+        .setTimestamp();
 
-    await message.channel.send({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], ephemeral: true });
 }
