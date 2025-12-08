@@ -184,8 +184,46 @@ module.exports = {
                     await updateTaskDiscordUrl(notionTaskId, teamMessageUrl);
                 }
 
+                // Log task creation to team log channel
+                try {
+                    const logChannelId = channelManager.getTeamLogChannel(team);
+
+                    if (logChannelId) {
+                        const logChannel = await interaction.client.channels.fetch(logChannelId);
+                        if (logChannel) {
+                            const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+                            const goToTaskButton = new ButtonBuilder()
+                                .setLabel('Go to Task')
+                                .setStyle(ButtonStyle.Link)
+                                .setURL(teamMessageUrl || notionResponse.url)
+                                .setEmoji('📋');
+
+                            const buttonRow = new ActionRowBuilder().addComponents(goToTaskButton);
+
+                            await logChannel.send({
+                                content: `✅ **Task Created!**\nAssigned to ${assignedTo.tag} in **${team}** team.`,
+                                components: [buttonRow]
+                            });
+                            logger.success(`Logged task creation to team log channel: ${team}`);
+                        }
+                    }
+                } catch (logError) {
+                    logger.warn('Failed to log task creation to team log channel', logError);
+                }
+
+                // Send ephemeral reply with button
+                const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+                const replyButton = new ButtonBuilder()
+                    .setLabel('Go to Task')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(teamMessageUrl || notionResponse.url)
+                    .setEmoji('📋');
+
+                const replyButtonRow = new ActionRowBuilder().addComponents(replyButton);
+
                 await interaction.editReply({
                     content: `✅ **Task Created!**\nAssigned to ${assignedTo.tag} in **${team}** team.`,
+                    components: [replyButtonRow]
                 });
             }
 

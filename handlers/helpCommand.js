@@ -40,7 +40,7 @@ async function sendGeneralHelp(message) {
                 name: '📝 Task Management', value:
                     '`/create` - Create a new task\n' +
                     '`/tasks` - View your active tasks\n' +
-                    '`/tasks filter:high|medium|low` - View tasks by priority'
+                    '`/tasks filter:1-10` - View tasks by priority (1=lowest, 10=highest)'
             },
             {
                 name: '🔒 Private Channels', value:
@@ -67,9 +67,9 @@ async function sendTeamHelp(message) {
             {
                 name: '📋 Team Tasks', value:
                     '`?team tasks` - View all active tasks for your team\n' +
-                    '`?team tasks high` - View high priority team tasks\n' +
-                    '`?team tasks medium` - View medium priority team tasks\n' +
-                    '`?team tasks low` - View low priority team tasks'
+                    '`?team tasks 10` - View priority 10 (critical) team tasks\n' +
+                    '`?team tasks 5` - View priority 5 (medium) team tasks\n' +
+                    '`?team tasks 1` - View priority 1 (minimal) team tasks'
             },
             {
                 name: '🔍 User Inspection', value:

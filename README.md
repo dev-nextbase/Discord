@@ -10,7 +10,7 @@ A powerful Discord bot that seamlessly integrates with Notion for comprehensive 
 - 🔘 **Interactive Buttons** - Real-time status updates (On Hold, Working, Done)
 - ⏱️ **Timestamp Tracking** - Automatic tracking of start and completion times
 - 📊 **Notion Sync** - All task data synchronized with Notion database
-- 🎯 **Priority Management** - Low, Medium, High priority levels
+- 🎯 **Priority Management** - 1-10 priority levels with color-coded emojis (🔴 10-9, 🟠 8-7, 🟡 6-5, 🟢 4-3, 🔵 2-1)
 - 👥 **Team Organization** - Route tasks by team assignments
 
 ## Prerequisites
@@ -60,7 +60,7 @@ npm install
    - **Assigned By** (Text)
    - **Assigned To** (Text)
    - **Team** (Select)
-   - **Priority** (Select: Low, Medium, High)
+   - **Priority** (Select: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)
    - **Status** (Select: On Hold, Working, Done)
    - **Started Working On** (Date)
    - **Done Working On** (Date)
@@ -125,7 +125,7 @@ Use the `/create` command in any channel:
   assigned_by: @Manager
   assigned_to: @Developer
   team: Development
-  priority: High
+  priority: 10
   attachment1: [optional file]
 ```
 

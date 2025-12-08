@@ -31,7 +31,7 @@ async function createTask(taskData) {
                     select: { name: taskData.team },
                 },
                 'Priority': {
-                    select: { name: taskData.priority.replace(/[🔴🟡🟢]\s*/g, '') },
+                    select: { name: taskData.priority.replace(/[🔴🟠🟡🟢🔵]\s*/g, '') },
                 },
                 'Status': {
                     select: { name: 'On Hold' },
@@ -151,11 +151,10 @@ async function getTasksByUser(userId, priorityFilter = 'all') {
         ];
 
         if (priorityFilter !== 'all') {
-            // Capitalize first letter for Notion (High, Medium, Low)
-            const formattedPriority = priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1);
+            // Priority is now numeric (1-10)
             filters.push({
                 property: 'Priority',
-                select: { equals: formattedPriority },
+                select: { equals: priorityFilter },
             });
         }
 
@@ -192,10 +191,10 @@ async function getTasksByTeam(teamName, priorityFilter = 'all') {
         ];
 
         if (priorityFilter !== 'all') {
-            const formattedPriority = priorityFilter.charAt(0).toUpperCase() + priorityFilter.slice(1);
+            // Priority is now numeric (1-10)
             filters.push({
                 property: 'Priority',
-                select: { equals: formattedPriority },
+                select: { equals: priorityFilter },
             });
         }
 

@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { getTasksByUser } = require('../services/notionService');
 const roleManager = require('../services/roleManager');
 const { getUserTeam } = require('../services/userTeamManager');
+const { getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -15,9 +16,16 @@ module.exports = {
                 .setRequired(false)
                 .addChoices(
                     { name: 'All', value: 'all' },
-                    { name: 'High', value: 'high' },
-                    { name: 'Medium', value: 'medium' },
-                    { name: 'Low', value: 'low' }
+                    { name: '🔴 10 - Critical', value: '10' },
+                    { name: '🔴 9 - Urgent', value: '9' },
+                    { name: '🟠 8 - High', value: '8' },
+                    { name: '🟠 7 - High', value: '7' },
+                    { name: '🟡 6 - Medium', value: '6' },
+                    { name: '🟡 5 - Medium', value: '5' },
+                    { name: '🟢 4 - Low', value: '4' },
+                    { name: '🟢 3 - Low', value: '3' },
+                    { name: '🔵 2 - Very Low', value: '2' },
+                    { name: '🔵 1 - Minimal', value: '1' }
                 )
         )
         .addUserOption(option =>
@@ -81,7 +89,7 @@ module.exports = {
             if (workingTasks.length > 0) {
                 message += '**▶️ Working**\n';
                 workingTasks.forEach((task, idx) => {
-                    const priorityEmoji = task.priority === 'High' ? '🔴' : task.priority === 'Medium' ? '🟡' : '🟢';
+                    const priorityEmoji = getPriorityEmoji(task.priority);
                     const url = task.discordUrl || task.url;
                     message += `${idx + 1}. ${priorityEmoji} [${task.title}](${url})\n`;
                 });
@@ -91,7 +99,7 @@ module.exports = {
             if (onHoldTasks.length > 0) {
                 message += '**⏸️ On Hold**\n';
                 onHoldTasks.forEach((task, idx) => {
-                    const priorityEmoji = task.priority === 'High' ? '🔴' : task.priority === 'Medium' ? '🟡' : '🟢';
+                    const priorityEmoji = getPriorityEmoji(task.priority);
                     const url = task.discordUrl || task.url;
                     message += `${idx + 1}. ${priorityEmoji} [${task.title}](${url})\n`;
                 });

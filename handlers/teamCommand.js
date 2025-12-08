@@ -1,5 +1,6 @@
 const { PermissionFlagsBits } = require('discord.js');
 const { assignRoleToTeam, listTeamRoles, removeTeamRole } = require('../services/teamRoleManager');
+const { getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
 const fs = require('fs');
 const path = require('path');
@@ -119,10 +120,10 @@ async function handleTeamCommand(message, args) {
     } else if (subcommand === 'tasks') {
         // ?team tasks [filter] [teamName]
         const filter = args[1]?.toLowerCase() || 'all';
-        const validFilters = ['all', 'high', 'medium', 'low'];
+        const validFilters = ['all', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
         if (!validFilters.includes(filter)) {
-            return message.reply('❌ Invalid filter. Use: `all`, `high`, `medium`, `low`');
+            return message.reply('❌ Invalid filter. Use: `all`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`');
         }
 
         const requesterId = message.author.id;
@@ -171,7 +172,7 @@ async function handleTeamCommand(message, args) {
             if (workingTasks.length > 0) {
                 response += '**▶️ Working**\n';
                 workingTasks.forEach((task, idx) => {
-                    const priorityEmoji = task.priority === 'High' ? '🔴' : task.priority === 'Medium' ? '🟡' : '🟢';
+                    const priorityEmoji = getPriorityEmoji(task.priority);
                     const url = task.discordUrl || task.url;
                     response += `${idx + 1}. ${priorityEmoji} [${task.title}](${url}) - ${task.assignedTo}\n`;
                 });
@@ -181,7 +182,7 @@ async function handleTeamCommand(message, args) {
             if (onHoldTasks.length > 0) {
                 response += '**⏸️ On Hold**\n';
                 onHoldTasks.forEach((task, idx) => {
-                    const priorityEmoji = task.priority === 'High' ? '🔴' : task.priority === 'Medium' ? '🟡' : '🟢';
+                    const priorityEmoji = getPriorityEmoji(task.priority);
                     const url = task.discordUrl || task.url;
                     response += `${idx + 1}. ${priorityEmoji} [${task.title}](${url}) - ${task.assignedTo}\n`;
                 });

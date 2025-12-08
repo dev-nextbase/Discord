@@ -1,12 +1,14 @@
 const { EmbedBuilder, ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 const { config } = require('../config/config');
 const { createTaskButtons } = require('../components/taskButtons');
+const { getFormattedPriority, getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
 
 function createTaskEmbed(taskData, notionTaskId) {
+    const priorityEmoji = getPriorityEmoji(taskData.priority);
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
-        .setTitle(`📋 ${taskData.task}`);
+        .setTitle(`${priorityEmoji} ${taskData.task}`);
 
     if (taskData.description && taskData.description.trim()) {
         const truncatedDesc = taskData.description.length > 500
@@ -16,7 +18,7 @@ function createTaskEmbed(taskData, notionTaskId) {
     }
 
     embed.setFooter({
-        text: `${taskData.priority} • ${taskData.assignedTo}`
+        text: `${getFormattedPriority(taskData.priority)} • ${taskData.assignedTo}`
     });
 
     return embed;

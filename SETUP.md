@@ -84,7 +84,7 @@ This guide will walk you through setting up the Discord bot and Notion integrati
    | Assigned By | Text | - |
    | Assigned To | Text | - |
    | Team | Select | Add your teams (e.g., Development, Design, Marketing) |
-   | Priority | Select | Add: Low, Medium, High |
+   | Priority | Select | Add: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 |
    | Status | Select | Add: On Hold, Working, Done |
    | Started Working On | Date | - |
    | Done Working On | Date | - |
@@ -218,7 +218,7 @@ Expected output:
    - assigned_by: @YourUsername
    - assigned_to: @SomeUser
    - team: "Development" (must match your Select option in Notion)
-   - priority: High
+   - priority: 10 (Critical)
 3. Press Enter
 
 **Expected Results:**
