@@ -1,6 +1,7 @@
 const { createTask } = require('../services/notionService');
 const { routeTaskMessages } = require('../services/messageRouter');
-const { getUserTeam } = require('../services/userTeamManager');
+const { getUserTeam } = require('../services/userTeamManagerNotion');
+const { MessageFlags } = require('discord.js');
 const logger = require('../utils/logger');
 
 /**
@@ -8,7 +9,7 @@ const logger = require('../utils/logger');
  */
 async function handleTaskCreationModal(interaction) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
         // Parse custom ID
         const parts = interaction.customId.split('_');
@@ -25,7 +26,7 @@ async function handleTaskCreationModal(interaction) {
         // Get users and team
         const assignedTo = await interaction.client.users.fetch(assignedToId);
         const assignedBy = interaction.user;
-        const team = getUserTeam(assignedToId);
+        const team = await getUserTeam(assignedToId);
 
         if (!team) {
             await interaction.editReply({

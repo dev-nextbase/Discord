@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -9,7 +9,7 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             // Create initial status board
             const embed = await createStatusBoardEmbed(interaction.client);
@@ -31,7 +31,7 @@ module.exports = {
 
             await interaction.editReply({
                 content: '✅ Status board created! It will auto-update when tasks change.',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
 
             logger.success(`Status board created in channel ${interaction.channelId}`);
@@ -39,7 +39,7 @@ module.exports = {
             logger.error('Error creating status board', error);
             await interaction.editReply({
                 content: '❌ Failed to create status board',
-                ephemeral: true
+                flags: MessageFlags.Ephemeral
             });
         }
     },
@@ -47,7 +47,7 @@ module.exports = {
 
 async function createStatusBoardEmbed(client) {
     const { getActiveTasksByUser } = require('../services/notionService');
-    const channelManager = require('../services/channelManager');
+    const channelManager = require('../services/channelManagerNotion');
 
     const embed = new EmbedBuilder()
         .setTitle('📊 Team Status Board')
@@ -56,7 +56,7 @@ async function createStatusBoardEmbed(client) {
 
     try {
         // Get all users with personal channels
-        const personalChannels = channelManager.listPersonChannels();
+        const personalChannels = await channelManager.listPersonChannels();
 
         if (Object.keys(personalChannels).length === 0) {
             embed.setDescription('No team members configured yet.');

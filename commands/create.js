@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const logger = require('../utils/logger');
 const { getPriorityChoices } = require('../utils/priorityHelper');
 
@@ -28,17 +28,23 @@ module.exports = {
         ),
 
     async execute(interaction) {
+        // CRITICAL: Defer reply IMMEDIATELY to prevent timeout
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } catch (deferError) {
+            logger.error('Failed to defer reply', deferError);
+            return; // Can't proceed if we can't defer
+        }
 
+        try {
             const taskTitle = interaction.options.getString('title');
             const assignedTo = interaction.options.getUser('assigned_to');
             const priority = interaction.options.getString('priority');
             const assignedBy = interaction.user;
 
             // Get team from user assignment (for channel routing)
-            const { getUserTeam } = require('../services/userTeamManager');
-            const team = getUserTeam(assignedTo.id);
+            const { getUserTeam } = require('../services/userTeamManagerNotion');
+            const team = await getUserTeam(assignedTo.id);
 
             if (!team) {
                 await interaction.editReply({
@@ -62,8 +68,8 @@ module.exports = {
             };
 
             // Check if current channel is private
-            const channelManager = require('../services/channelManager');
-            const isPrivate = channelManager.isPrivateChannel(interaction.channelId);
+            const channelManager = require('../services/channelManagerNotion');
+            const isPrivate = await channelManager.isPrivateChannel(interaction.channelId);
             logger.info(`Channel ${interaction.channelId} is private: ${isPrivate}`);
 
             const { createTask } = require('../services/notionService');
@@ -124,8 +130,8 @@ module.exports = {
                     }
 
                     // Send to personal channel with redirect button
-                    const channelManager = require('../services/channelManager');
-                    const personalChannelId = channelManager.getPersonChannel(assignedTo.id);
+                    const channelManager = require('../services/channelManagerNotion');
+                    const personalChannelId = await channelManager.getPersonChannel(assignedTo.id);
 
                     if (personalChannelId) {
                         try {
@@ -181,31 +187,28 @@ module.exports = {
                     await updateTaskDiscordUrl(notionTaskId, teamMessageUrl);
                 }
 
-                // Log task creation to team log channel
+                // Send DM to task creator (assigner)
                 try {
-                    const logChannelId = channelManager.getTeamLogChannel(team);
+                    const creatorMessagePayload = {
+                        content: `✅ **Task Created!**\nTask: **${taskTitle}**\nAssigned to: ${assignedTo.tag}\nTeam: **${team}**`
+                    };
 
-                    if (logChannelId) {
-                        const logChannel = await interaction.client.channels.fetch(logChannelId);
-                        if (logChannel) {
-                            const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-                            const goToTaskButton = new ButtonBuilder()
-                                .setLabel('Go to Task')
-                                .setStyle(ButtonStyle.Link)
-                                .setURL(teamMessageUrl || notionResponse.url)
-                                .setEmoji('📋');
-
-                            const buttonRow = new ActionRowBuilder().addComponents(goToTaskButton);
-
-                            await logChannel.send({
-                                content: `✅ **Task Created!**\nAssigned to ${assignedTo.tag} in **${team}** team.`,
-                                components: [buttonRow]
-                            });
-                            logger.success(`Logged task creation to team log channel: ${team}`);
-                        }
+                    // Add Go to Thread button if team message URL exists
+                    if (teamMessageUrl) {
+                        const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+                        const goToThreadButton = new ButtonBuilder()
+                            .setLabel('Go to Thread')
+                            .setStyle(ButtonStyle.Link)
+                            .setURL(teamMessageUrl)
+                            .setEmoji('↗️');
+                        const row = new ActionRowBuilder().addComponents(goToThreadButton);
+                        creatorMessagePayload.components = [row];
                     }
-                } catch (logError) {
-                    logger.warn('Failed to log task creation to team log channel', logError);
+
+                    await assignedBy.send(creatorMessagePayload);
+                    logger.success('Sent task creation notification to creator via DM');
+                } catch (dmError) {
+                    logger.warn('Failed to send DM to task creator', dmError);
                 }
 
                 // Send ephemeral reply with button
@@ -218,9 +221,11 @@ module.exports = {
 
                 const replyButtonRow = new ActionRowBuilder().addComponents(replyButton);
 
-                await interaction.editReply({
-                    content: `✅ **Task Created!**\nAssigned to ${assignedTo.tag} in **${team}** team.`,
-                    components: [replyButtonRow]
+                // Use followUp instead of editReply to avoid interaction conflicts
+                await interaction.followUp({
+                    content: `✅ **Task Created!**\\nAssigned to ${assignedTo.tag} in **${team}** team.`,
+                    components: [replyButtonRow],
+                    flags: MessageFlags.Ephemeral
                 });
             }
 
@@ -229,15 +234,20 @@ module.exports = {
             console.error('CRITICAL ERROR IN CREATE COMMAND:', error);
             logger.error('Error creating task', error);
 
-            if (interaction.deferred || interaction.replied) {
-                await interaction.editReply({
-                    content: `❌ Failed to create task: ${error.message}`,
-                });
-            } else {
-                await interaction.reply({
-                    content: `❌ Failed to create task: ${error.message}`,
-                    ephemeral: true
-                });
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.followUp({
+                        content: `❌ Failed to create task: ${error.message}`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                } else {
+                    await interaction.reply({
+                        content: `❌ Failed to create task: ${error.message}`,
+                        flags: MessageFlags.Ephemeral
+                    });
+                }
+            } catch (replyError) {
+                logger.error('Failed to send error response to user', replyError);
             }
         }
     },

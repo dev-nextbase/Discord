@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const { getTaskReportByUser } = require('../services/notionService');
 const logger = require('../utils/logger');
 
@@ -33,7 +33,7 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const period = interaction.options.getString('period');
             const startDateStr = interaction.options.getString('start_date');

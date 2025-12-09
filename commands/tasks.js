@@ -1,7 +1,7 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { getTasksByUser } = require('../services/notionService');
-const roleManager = require('../services/roleManager');
-const { getUserTeam } = require('../services/userTeamManager');
+const roleManager = require('../services/roleManagerNotion');
+const { getUserTeam } = require('../services/userTeamManagerNotion');
 const { getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
 
@@ -37,7 +37,7 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const filter = interaction.options.getString('filter') || 'all';
             const targetUser = interaction.options.getUser('user');
@@ -48,12 +48,12 @@ module.exports = {
             // Permission check if checking another user
             if (targetUser) {
                 const requesterId = interaction.user.id;
-                const isAdmin = roleManager.isAdmin(requesterId);
+                const isAdmin = await roleManager.isAdmin(requesterId);
 
                 if (!isAdmin) {
                     // Check if Team Lead
-                    const targetUserTeam = getUserTeam(targetUser.id);
-                    const isLead = roleManager.isTeamLead(requesterId, targetUserTeam);
+                    const targetUserTeam = await getUserTeam(targetUser.id);
+                    const isLead = await roleManager.isTeamLead(requesterId, targetUserTeam);
 
                     if (!isLead) {
                         return interaction.editReply({

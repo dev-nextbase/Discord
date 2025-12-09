@@ -1,4 +1,4 @@
-const roleManager = require('../services/roleManager');
+const roleManager = require('../services/roleManagerNotion');
 const logger = require('../utils/logger');
 
 module.exports = {
@@ -34,7 +34,7 @@ module.exports = {
         if (subcommand === 'add') {
             const roleType = args[1]?.toLowerCase();
             if (roleType === 'admin') {
-                if (roleManager.addAdmin(targetUser.id)) {
+                if (await roleManager.addAdmin(targetUser.id)) {
                     message.reply(`✅ Added ${targetUser.tag} as Admin.`);
                 } else {
                     message.reply(`ℹ️ ${targetUser.tag} is already an Admin.`);
@@ -43,7 +43,7 @@ module.exports = {
                 const teamName = args[3];
                 if (!teamName) return message.reply('❌ Please specify a team name.');
 
-                if (roleManager.addTeamLead(targetUser.id, teamName)) {
+                if (await roleManager.addTeamLead(targetUser.id, teamName)) {
                     message.reply(`✅ Added ${targetUser.tag} as Team Lead for **${teamName}**.`);
                 } else {
                     message.reply(`ℹ️ ${targetUser.tag} is already a Team Lead for ${teamName}.`);
@@ -54,7 +54,7 @@ module.exports = {
         } else if (subcommand === 'remove') {
             const roleType = args[1]?.toLowerCase();
             if (roleType === 'admin') {
-                if (roleManager.removeAdmin(targetUser.id)) {
+                if (await roleManager.removeAdmin(targetUser.id)) {
                     message.reply(`✅ Removed ${targetUser.tag} from Admins.`);
                 } else {
                     message.reply(`ℹ️ ${targetUser.tag} is not an Admin.`);
@@ -63,7 +63,7 @@ module.exports = {
                 const teamName = args[3];
                 if (!teamName) return message.reply('❌ Please specify a team name.');
 
-                if (roleManager.removeTeamLead(targetUser.id, teamName)) {
+                if (await roleManager.removeTeamLead(targetUser.id, teamName)) {
                     message.reply(`✅ Removed ${targetUser.tag} from Team Leads for **${teamName}**.`);
                 } else {
                     message.reply(`ℹ️ ${targetUser.tag} is not a Team Lead for ${teamName}.`);

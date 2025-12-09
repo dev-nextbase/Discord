@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const roleManager = require('../services/roleManager');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
+const roleManager = require('../services/roleManagerNotion');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -23,22 +23,22 @@ module.exports = {
 
         if (category === 'admin') {
             // Check if user is admin
-            if (!roleManager.isAdmin(userId) && interaction.guild.ownerId !== userId) {
+            if (!await roleManager.isAdmin(userId) && interaction.guild.ownerId !== userId) {
                 return interaction.reply({
                     content: '❌ You do not have permission to view Admin help.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
             await sendAdminHelp(interaction);
         } else if (category === 'team') {
             // Check if user is team lead or admin
-            const isLead = roleManager.isTeamLead(userId);
-            const isAdmin = roleManager.isAdmin(userId);
+            const isLead = await roleManager.isTeamLead(userId);
+            const isAdmin = await roleManager.isAdmin(userId);
 
             if (!isLead && !isAdmin && interaction.guild.ownerId !== userId) {
                 return interaction.reply({
                     content: '❌ You do not have permission to view Team Lead help.',
-                    ephemeral: true
+                    flags: MessageFlags.Ephemeral
                 });
             }
             await sendTeamHelp(interaction);
@@ -106,7 +106,7 @@ async function sendGeneralHelp(interaction) {
         .setFooter({ text: 'For advanced commands, use /help category:Team Lead or /help category:Admin' })
         .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function sendTeamHelp(interaction) {
@@ -145,7 +145,7 @@ async function sendTeamHelp(interaction) {
         .setFooter({ text: 'Team Leads have access to all general commands plus these special commands' })
         .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 async function sendAdminHelp(interaction) {
@@ -181,5 +181,5 @@ async function sendAdminHelp(interaction) {
         .setFooter({ text: 'Admins have access to all commands in the bot' })
         .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }

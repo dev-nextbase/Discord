@@ -3,6 +3,8 @@ const { config } = require('../config/config');
 const { createTaskButtons } = require('../components/taskButtons');
 const { getFormattedPriority, getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
+const { Client } = require('@notionhq/client');
+const notion = new Client({ auth: config.notion.token });
 
 function createTaskEmbed(taskData, notionTaskId) {
     const priorityEmoji = getPriorityEmoji(taskData.priority);
@@ -17,16 +19,26 @@ function createTaskEmbed(taskData, notionTaskId) {
         embed.setDescription(truncatedDesc);
     }
 
-    embed.setFooter({
-        text: `${getFormattedPriority(taskData.priority)} • ${taskData.assignedTo}`
+    // Add Assigned To field
+    embed.addFields({
+        name: 'Assigned To',
+        value: taskData.assignedTo,
+        inline: true
     });
+
+    // Footer shows priority and assigned by
+    const footerText = taskData.assignedBy
+        ? `${priorityEmoji} ${taskData.priority} • assigned by ${taskData.assignedBy}`
+        : `${getFormattedPriority(taskData.priority)} • ${taskData.assignedTo}`;
+
+    embed.setFooter({ text: footerText });
 
     return embed;
 }
 
 async function sendToTeamChannel(client, taskData, notionTaskId) {
     try {
-        const channelId = config.channels.getTeamChannel(taskData.team);
+        const channelId = await config.channels.getTeamChannel(taskData.team);
         logger.info(`Routing task for team '${taskData.team}' to channel ID: ${channelId}`);
 
         if (!channelId) {
@@ -84,7 +96,7 @@ async function sendToTeamChannel(client, taskData, notionTaskId) {
 
 async function sendToPersonChannel(client, userId, taskData, notionTaskId, teamMessageUrl) {
     try {
-        const channelId = config.channels.getPersonChannel(userId);
+        const channelId = await config.channels.getPersonChannel(userId);
         if (!channelId) {
             logger.warn(`No personal channel configured for user: ${userId}`);
             return;
@@ -115,8 +127,29 @@ async function sendToPersonChannel(client, userId, taskData, notionTaskId, teamM
             messagePayload.files = taskData.attachments.map(att => att.url);
         }
 
-        await channel.send(messagePayload);
-        logger.success(`Sent task to personal channel for user: ${userId}`);
+        const personalMessage = await channel.send(messagePayload);
+        logger.info(`Personal message sent. URL: ${personalMessage.url}`);
+
+        // Save personal message URL to Notion
+        try {
+            logger.info(`Attempting to save personal message URL to Notion for task: ${notionTaskId}`);
+            const updateResponse = await notion.pages.update({
+                page_id: notionTaskId,
+                properties: {
+                    'Backlog Message URL': {
+                        url: personalMessage.url
+                    }
+                }
+            });
+            logger.success(`✅ Sent task to personal channel and saved URL for user: ${userId}`);
+            logger.info(`Notion update response: ${JSON.stringify(updateResponse.properties['Backlog Message URL'])}`);
+        } catch (error) {
+            logger.error('❌ Failed to save personal message URL to Notion', error);
+            logger.error(`Error details: ${error.message}`);
+            if (error.body) {
+                logger.error(`Notion API error body: ${JSON.stringify(error.body)}`);
+            }
+        }
     } catch (error) {
         logger.error(`Failed to send to person channel for user: ${userId}`, error);
     }

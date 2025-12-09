@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, MessageFlags } = require('discord.js');
 const { config, validateConfig } = require('./config/config');
 const logger = require('./utils/logger');
 const fs = require('fs');
@@ -89,7 +89,7 @@ client.on('interactionCreate', async interaction => {
 
             const errorMessage = {
                 content: '❌ There was an error executing this command!',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             };
 
             if (interaction.replied || interaction.deferred) {

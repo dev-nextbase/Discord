@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { assignUserToTeam, listUserTeams, removeUserTeam } = require('../services/userTeamManager');
+const { assignUserToTeam, listUserTeams, removeUserTeam } = require('../services/userTeamManagerNotion');
 const logger = require('../utils/logger');
 
 /**
@@ -32,7 +32,7 @@ async function handleAssignCommand(message, args) {
         const teamName = args.slice(1).join(' ');
 
         // Assign user to team
-        assignUserToTeam(userId, teamName);
+        await assignUserToTeam(userId, teamName);
 
         await message.reply(
             `✅ **User assigned to team!**\n\n` +

@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const roleManager = require('../services/roleManager');
+const roleManager = require('../services/roleManagerNotion');
 
 module.exports = {
     name: 'help',
@@ -10,14 +10,14 @@ module.exports = {
 
         if (subcommand === 'admin') {
             // Check if user is admin
-            if (!roleManager.isAdmin(userId) && message.guild.ownerId !== userId) {
+            if (!await roleManager.isAdmin(userId) && message.guild.ownerId !== userId) {
                 return message.reply('❌ You do not have permission to view Admin help.');
             }
             await sendAdminHelp(message);
         } else if (subcommand === 'team') {
             // Check if user is team lead or admin
-            const isLead = roleManager.isTeamLead(userId);
-            const isAdmin = roleManager.isAdmin(userId);
+            const isLead = await roleManager.isTeamLead(userId);
+            const isAdmin = await roleManager.isAdmin(userId);
 
             if (!isLead && !isAdmin && message.guild.ownerId !== userId) {
                 return message.reply('❌ You do not have permission to view Team Lead help.');

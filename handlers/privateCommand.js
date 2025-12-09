@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const channelManager = require('../services/channelManager');
+const channelManager = require('../services/channelManagerNotion');
 const logger = require('../utils/logger');
 
 /**
@@ -18,17 +18,17 @@ async function handlePrivateCommand(message, args) {
         // ?private add #channel
         const channel = message.mentions.channels.first() || message.channel;
 
-        channelManager.addPrivateChannel(channel.id);
+        await channelManager.addPrivateChannel(channel.id);
         await message.reply(`✅ Channel ${channel} marked as **Private**. Tasks created here will stay here.`);
     } else if (subcommand === 'remove') {
         // ?private remove #channel
         const channel = message.mentions.channels.first() || message.channel;
 
-        channelManager.removePrivateChannel(channel.id);
+        await channelManager.removePrivateChannel(channel.id);
         await message.reply(`✅ Channel ${channel} is no longer private.`);
     } else if (subcommand === 'list') {
         // ?private list
-        const privateChannels = channelManager.listPrivateChannels();
+        const privateChannels = await channelManager.listPrivateChannels();
 
         if (privateChannels.length === 0) {
             await message.reply('📋 No private channels configured.');

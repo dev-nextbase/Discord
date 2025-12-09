@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { config } = require('../config/config');
+const channelManager = require('../services/channelManagerNotion');
 const logger = require('../utils/logger');
 
 /**
@@ -39,7 +39,7 @@ async function handleUserCommand(message, args) {
                 return;
             }
 
-            config.channels.setPersonChannel(userId, channelId);
+            await channelManager.setPersonChannel(userId, channelId);
             await message.reply(`✅ Personal channel for ${user.tag} set to ${channel}`);
         } catch (error) {
             logger.error('Error in ?user add command', error);
@@ -47,7 +47,7 @@ async function handleUserCommand(message, args) {
         }
     } else if (subcommand === 'list') {
         // ?user list
-        const personChannels = config.channels.listPersonChannels();
+        const personChannels = await channelManager.listPersonChannels();
 
         if (Object.keys(personChannels).length === 0) {
             await message.reply('📋 No personal channels configured yet.');

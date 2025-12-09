@@ -9,26 +9,27 @@ const config = {
   notion: {
     token: process.env.NOTION_TOKEN,
     databaseId: process.env.NOTION_DATABASE_ID,
+    configDatabaseId: process.env.NOTION_CONFIG_DB_ID,
   },
   channels: {
     // Get team channel from JSON
     getTeamChannel: (teamName) => {
-      const channelManager = require('../services/channelManager');
+      const channelManager = require('../services/channelManagerNotion');
       return channelManager.getTeamChannel(teamName);
     },
     // Get person channel from JSON
     getPersonChannel: (userId) => {
-      const channelManager = require('../services/channelManager');
+      const channelManager = require('../services/channelManagerNotion');
       return channelManager.getPersonChannel(userId);
     },
     // Set person channel
     setPersonChannel: (userId, channelId) => {
-      const channelManager = require('../services/channelManager');
+      const channelManager = require('../services/channelManagerNotion');
       return channelManager.setPersonChannel(userId, channelId);
     },
     // List all person channels
     listPersonChannels: () => {
-      const channelManager = require('../services/channelManager');
+      const channelManager = require('../services/channelManagerNotion');
       return channelManager.listPersonChannels();
     },
   },
@@ -42,6 +43,7 @@ function validateConfig() {
     'GUILD_ID',
     'NOTION_TOKEN',
     'NOTION_DATABASE_ID',
+    'NOTION_CONFIG_DB_ID',
   ];
 
   const missing = required.filter(key => !process.env[key]);

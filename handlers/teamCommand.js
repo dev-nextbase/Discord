@@ -1,12 +1,8 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { assignRoleToTeam, listTeamRoles, removeTeamRole } = require('../services/teamRoleManager');
+const { assignRoleToTeam, listTeamRoles, removeTeamRole } = require('../services/teamRoleManagerNotion');
 const { getPriorityEmoji } = require('../utils/priorityHelper');
 const logger = require('../utils/logger');
-const fs = require('fs');
-const path = require('path');
-const roleManager = require('../services/roleManager');
-
-const TEAM_ROLES_FILE = path.join(__dirname, '../services/teamRoles.json');
+const roleManager = require('../services/roleManagerNotion');
 
 /**
  * Handles ?team command to map teams to Discord roles
@@ -17,7 +13,8 @@ async function handleTeamCommand(message, args) {
     // Permission check for admin-only commands
     const adminCommands = ['add', 'channel', 'log', 'remove', 'clear'];
     if (adminCommands.includes(subcommand)) {
-        if (!message.member.permissions.has(PermissionFlagsBits.Administrator) && !roleManager.isAdmin(message.author.id)) {
+        const isAdmin = await roleManager.isAdmin(message.author.id);
+        if (!message.member.permissions.has(PermissionFlagsBits.Administrator) && !isAdmin) {
             await message.reply('❌ Only administrators can manage team configuration.');
             return;
         }
@@ -33,26 +30,40 @@ async function handleTeamCommand(message, args) {
             return;
         }
 
-        assignRoleToTeam(teamName, roleMention.id);
+        await assignRoleToTeam(teamName, roleMention.id);
         await message.reply(`✅ Team **${teamName}** linked to role ${roleMention}`);
 
     } else if (subcommand === 'list') {
         // ?team list
-        const teams = listTeamRoles();
+        const teams = await listTeamRoles();
 
         if (Object.keys(teams).length === 0) {
             await message.reply('📋 No team roles configured yet.');
             return;
         }
 
+        const { getAllUsersInTeam } = require('../services/userTeamManagerNotion');
+
         let response = '**📋 Team Roles & Members:**\n';
         for (const [team, roleId] of Object.entries(teams)) {
             const role = message.guild.roles.cache.get(roleId);
 
             if (role) {
-                // Fetch members with this role
-                const members = role.members.map(m => m.user.tag).join(', ');
-                response += `\n• **${team}**: ${role.toString()}\n  Members: ${members || 'None'}`;
+                // Fetch members assigned to this team in Notion
+                const userIds = await getAllUsersInTeam(team);
+                const memberTags = [];
+
+                for (const userId of userIds) {
+                    try {
+                        const member = await message.guild.members.fetch(userId);
+                        memberTags.push(member.user.tag);
+                    } catch (error) {
+                        logger.warn(`Could not fetch member ${userId}`);
+                    }
+                }
+
+                const membersDisplay = memberTags.join(', ') || 'None';
+                response += `\n• **${team}**: ${role.toString()}\n  Members: ${membersDisplay}`;
             } else {
                 response += `\n• **${team}**: \`${roleId}\` (role not found)`;
             }
@@ -70,34 +81,24 @@ async function handleTeamCommand(message, args) {
             return;
         }
 
-        const channelManager = require('../services/channelManager');
-        channelManager.setTeamChannel(teamName, channel.id);
+        const channelManager = require('../services/channelManagerNotion');
+        await channelManager.setTeamChannel(teamName, channel.id);
         await message.reply(`✅ Team **${teamName}** channel set to ${channel}`);
 
-    } else if (subcommand === 'log') {
-        // ?team log TeamName <#channel or ID>
+    } else if (subcommand === 'backlog') {
+        // ?team backlog TeamName #channel
         const teamName = args[1];
-        const channelInput = args[2];
+        const channel = message.mentions.channels.first();
 
-        if (!teamName || !channelInput) {
-            await message.reply('❌ Usage: `?team log TeamName <#channel or ID>`');
+        if (!teamName || !channel) {
+            await message.reply('❌ Usage: `?team backlog TeamName #channel`');
             return;
         }
 
-        // Extract ID from mention or use raw input
-        const channelId = channelInput.replace(/[<#>]/g, '');
+        const channelManager = require('../services/channelManagerNotion');
+        await channelManager.setTeamBacklogChannel(teamName, channel.id);
+        await message.reply(`✅ Team **${teamName}** backlog channel set to ${channel}`);
 
-        // Verify channel exists
-        const channel = await message.guild.channels.fetch(channelId).catch(() => null);
-
-        if (!channel) {
-            await message.reply(`❌ Invalid channel: ${channelInput}`);
-            return;
-        }
-
-        const channelManager = require('../services/channelManager');
-        channelManager.setTeamLogChannel(teamName, channel.id);
-        await message.reply(`✅ Team **${teamName}** LOG channel set to ${channel}`);
 
     } else if (subcommand === 'remove') {
         // ?team remove TeamName
@@ -108,14 +109,18 @@ async function handleTeamCommand(message, args) {
             return;
         }
 
-        removeTeamRole(teamName);
+        await removeTeamRole(teamName);
         await message.reply(`✅ Removed role assignment for team **${teamName}**`);
 
     } else if (subcommand === 'clear') {
         // ?team clear - remove all teams
+        // Not implemented for Notion yet to avoid accidental mass deletion
+        await message.reply('❌ The `clear` command is temporarily disabled for safety with Notion database.');
+        /*
         fs.writeFileSync(TEAM_ROLES_FILE, JSON.stringify({ teamRoles: {} }, null, 2));
         await message.reply('✅ **All team role assignments cleared**');
         logger.success('All team roles cleared');
+        */
 
     } else if (subcommand === 'tasks') {
         // ?team tasks [filter] [teamName]
@@ -127,8 +132,8 @@ async function handleTeamCommand(message, args) {
         }
 
         const requesterId = message.author.id;
-        const isAdmin = roleManager.isAdmin(requesterId);
-        const ledTeams = roleManager.getLedTeams(requesterId);
+        const isAdmin = await roleManager.isAdmin(requesterId);
+        const ledTeams = await roleManager.getLedTeams(requesterId);
 
         if (!isAdmin && ledTeams.length === 0) {
             return message.reply('❌ You must be a Team Lead or Admin to use this command.');
@@ -211,8 +216,8 @@ async function handleTeamCommand(message, args) {
             '`?team channel TeamName #channel` - Set channel for team tasks\n' +
             '`?team log TeamName #channel` - Set channel for completion logs\n' +
             '`?team list` - Show teams, roles, and members\n' +
-            '`?team remove TeamName` - Remove a team role assignment\n' +
-            '`?team clear` - Remove ALL team role assignments'
+            '`?team remove TeamName` - Remove a team role assignment\n'
+            // '`?team clear` - Remove ALL team role assignments' // Disabled
         );
     }
 }

@@ -2,8 +2,10 @@ const {
     updateTaskStatus,
     updateWorkingTimestamp,
     updateDoneTimestamp,
-    getTaskById
+    getTaskById,
+    accumulateTimeSpent
 } = require('../services/notionService');
+const { MessageFlags } = require('discord.js');
 const { createUpdatedButtons } = require('../components/taskButtons');
 const logger = require('../utils/logger');
 
@@ -18,7 +20,19 @@ async function handleButtonInteraction(interaction) {
             return;
         }
 
-        await interaction.deferReply({ ephemeral: true });
+        // Handle backlog button separately
+        if (action === 'backlog') {
+            await handleBacklogButton(interaction, taskId);
+            return;
+        }
+
+        // CRITICAL: Defer reply immediately - if this fails, the interaction has timed out
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        } catch (deferError) {
+            logger.error('Failed to defer button interaction - interaction may have timed out', deferError);
+            return; // Can't proceed if we can't defer
+        }
 
         const statusMap = {
             'onhold': 'On Hold',
@@ -34,7 +48,20 @@ async function handleButtonInteraction(interaction) {
         }
 
         // Get task details to check permissions
-        const taskDetails = await getTaskById(taskId);
+        let taskDetails;
+        try {
+            taskDetails = await getTaskById(taskId);
+        } catch (error) {
+            if (error.code === 'object_not_found') {
+                logger.warn(`Task ${taskId} not found in Notion - may have been deleted`);
+                await interaction.editReply({
+                    content: '❌ This task is from an old database or has been deleted. Please create a new task using `/create`.'
+                });
+                return;
+            }
+            throw error; // Re-throw other errors
+        }
+
         const assignedToId = taskDetails.properties['Assigned To ID']?.rich_text[0]?.text?.content;
         const taskTeam = taskDetails.properties['Team']?.select?.name;
 
@@ -44,9 +71,9 @@ async function handleButtonInteraction(interaction) {
         }
 
         // Check permissions
-        const roleManager = require('../services/roleManager');
+        const roleManager = require('../services/roleManagerNotion');
         const isAssignedPerson = interaction.user.id === assignedToId;
-        const isTeamLead = taskTeam && roleManager.isTeamLead(interaction.user.id, taskTeam);
+        const isTeamLead = taskTeam && await roleManager.isTeamLead(interaction.user.id, taskTeam);
 
         // Only assigned person and their team lead can change status
         if (!isAssignedPerson && !isTeamLead) {
@@ -100,7 +127,18 @@ async function handleButtonInteraction(interaction) {
 
         if (action === 'working') {
             updateWorkingTimestamp(taskId).catch(err => logger.error('Timestamp update failed', err));
+        } else if (action === 'onhold') {
+            // Accumulate time when going from Working to On Hold
+            const currentStatus = taskDetails.properties['Status']?.select?.name;
+            if (currentStatus === 'Working') {
+                accumulateTimeSpent(taskId).catch(err => logger.error('Time accumulation failed', err));
+            }
         } else if (action === 'done') {
+            // Accumulate time when marking as Done (if it was Working)
+            const currentStatus = taskDetails.properties['Status']?.select?.name;
+            if (currentStatus === 'Working') {
+                accumulateTimeSpent(taskId).catch(err => logger.error('Time accumulation failed', err));
+            }
             updateDoneTimestamp(taskId, interaction.user.tag, interaction.user.id).catch(err => logger.error('Done timestamp failed', err));
 
             // 1. Notify Assigner
@@ -136,8 +174,8 @@ async function handleButtonInteraction(interaction) {
             // 2. Remove from Personal Channel
             if (assignedToId) {
                 try {
-                    const { config } = require('../config/config');
-                    const personalChannelId = config.channels.getPersonChannel(assignedToId);
+                    const channelManager = require('../services/channelManagerNotion');
+                    const personalChannelId = await channelManager.getPersonChannel(assignedToId);
 
                     if (personalChannelId) {
                         const personalChannel = await interaction.client.channels.fetch(personalChannelId);
@@ -164,48 +202,7 @@ async function handleButtonInteraction(interaction) {
                 }
             }
 
-            // 3. Log to Team Log Channel
-            if (teamName) {
-                try {
-                    const { config } = require('../config/config');
-                    const channelManager = require('../services/channelManager');
 
-                    // Try to get log channel, fallback to main team channel if needed (or just don't log)
-                    const logChannelId = channelManager.getTeamLogChannel(teamName);
-
-                    if (logChannelId) {
-                        const logChannel = await interaction.client.channels.fetch(logChannelId);
-                        if (logChannel) {
-                            const teamMessageUrl = interaction.message.url;
-                            const channelMention = `<#${interaction.channelId}>`;
-
-                            const logEmbed = {
-                                color: 0x57F287, // Green
-                                title: '✅ Task Completed',
-                                fields: [
-                                    { name: 'Task', value: taskTitle, inline: true },
-                                    { name: 'Completed By', value: `<@${assignedToId}>`, inline: true },
-                                    { name: 'Team', value: teamName, inline: true },
-                                    { name: 'Channel', value: channelMention, inline: true }
-                                ],
-                            };
-
-                            const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-                            const linkButton = new ButtonBuilder()
-                                .setLabel('View Thread')
-                                .setStyle(ButtonStyle.Link)
-                                .setURL(teamMessageUrl);
-
-                            const row = new ActionRowBuilder().addComponents(linkButton);
-
-                            await logChannel.send({ embeds: [logEmbed], components: [row] });
-                            logger.success(`Logged completion to team log channel: ${teamName}`);
-                        }
-                    }
-                } catch (error) {
-                    logger.error('Failed to log to team log channel', error);
-                }
-            }
         }
 
         // Update status board if it exists
@@ -256,22 +253,32 @@ async function updateStatusBoard(client) {
 
 async function handleReassignButton(interaction, taskId) {
     try {
-        await interaction.deferReply({ ephemeral: true });
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        const roleManager = require('../services/roleManager');
+        const roleManager = require('../services/roleManagerNotion');
         const { getTaskById } = require('../services/notionService');
-        const { getUserTeamByRoles, getTeamRole } = require('../services/teamRoleManager');
+        const { getUserTeamByRoles, getTeamRole } = require('../services/teamRoleManagerNotion');
 
         // Get task details
-        const taskDetails = await getTaskById(taskId);
+        let taskDetails;
+        try {
+            taskDetails = await getTaskById(taskId);
+        } catch (error) {
+            if (error.code === 'object_not_found') {
+                logger.warn(`Task ${taskId} not found in Notion - may have been deleted`);
+                await interaction.editReply({
+                    content: '❌ This task is from an old database or has been deleted. Please create a new task using `/create`.'
+                });
+                return;
+            }
+            throw error; // Re-throw other errors
+        }
+
         const assignedToId = taskDetails.properties['Assigned To ID']?.rich_text[0]?.text?.content;
         const taskTitle = taskDetails.properties['Task']?.title[0]?.text?.content;
         const taskTeam = taskDetails.properties['Team']?.select?.name;
 
-        if (!assignedToId) {
-            await interaction.editReply({ content: '❌ Task data incomplete' });
-            return;
-        }
+        // Note: assignedToId can be empty for backlog tasks, which is valid
 
         if (!taskTeam) {
             await interaction.editReply({ content: '❌ Could not determine task team' });
@@ -279,8 +286,8 @@ async function handleReassignButton(interaction, taskId) {
         }
 
         // Check if user is team lead or admin
-        const isTeamLead = roleManager.isTeamLead(interaction.user.id, taskTeam);
-        const isAdmin = roleManager.isAdmin(interaction.user.id);
+        const isTeamLead = await roleManager.isTeamLead(interaction.user.id, taskTeam);
+        const isAdmin = await roleManager.isAdmin(interaction.user.id);
         const isOwner = interaction.guild.ownerId === interaction.user.id;
 
         if (!isTeamLead && !isAdmin && !isOwner) {
@@ -291,10 +298,10 @@ async function handleReassignButton(interaction, taskId) {
         }
 
         // Get all members assigned to this team from userTeams.json
-        const { getUserTeam, getAllUsersInTeam } = require('../services/userTeamManager');
+        const { getUserTeam, getAllUsersInTeam } = require('../services/userTeamManagerNotion');
 
         // Get all user IDs in this team
-        const teamUserIds = getAllUsersInTeam(taskTeam);
+        const teamUserIds = await getAllUsersInTeam(taskTeam);
 
         if (!teamUserIds || teamUserIds.length === 0) {
             await interaction.editReply({ content: '❌ No team members found' });
@@ -324,7 +331,7 @@ async function handleReassignButton(interaction, taskId) {
             }
         }
 
-        if (options.length === 0) {
+        if (options.length === 0) { // No team members available
             await interaction.editReply({ content: '❌ No other team members available for reassignment' });
             return;
         }
@@ -346,6 +353,44 @@ async function handleReassignButton(interaction, taskId) {
         logger.error('Error handling reassign button', error);
         try {
             await interaction.editReply({ content: '❌ Failed to show reassignment options' });
+        } catch (replyError) {
+            logger.error('Failed to send error reply', replyError);
+        }
+    }
+}
+
+async function handleBacklogButton(interaction, taskId) {
+    try {
+        // Defer the interaction first
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+        // Import and call the backlog handler directly
+        const selectMenuHandler = require('./selectMenuHandler');
+
+        // Check if the module exports handleMoveToBacklog
+        if (selectMenuHandler.handleMoveToBacklog) {
+            await selectMenuHandler.handleMoveToBacklog(interaction, taskId);
+        } else {
+            // If not exported, we need to handle it here
+            logger.error('handleMoveToBacklog not exported from selectMenuHandler');
+            await interaction.editReply({
+                content: '❌ Failed to move task to backlog - handler not found'
+            });
+        }
+
+    } catch (error) {
+        logger.error('Error handling backlog button', error);
+        try {
+            if (interaction.deferred || interaction.replied) {
+                await interaction.editReply({
+                    content: '❌ Failed to move task to backlog'
+                });
+            } else {
+                await interaction.reply({
+                    content: '❌ Failed to move task to backlog',
+                    flags: MessageFlags.Ephemeral
+                });
+            }
         } catch (replyError) {
             logger.error('Failed to send error reply', replyError);
         }
