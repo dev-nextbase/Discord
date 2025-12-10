@@ -29,11 +29,20 @@ module.exports = {
 
     async execute(interaction) {
         // CRITICAL: Defer reply IMMEDIATELY to prevent timeout
+        // Check if interaction is already acknowledged
+        if (interaction.replied || interaction.deferred) {
+            logger.warn('Interaction already acknowledged, skipping defer');
+            return;
+        }
+
         try {
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         } catch (deferError) {
             logger.error('Failed to defer reply', deferError);
-            return; // Can't proceed if we can't defer
+            // If it's already acknowledged, that's okay, continue
+            if (deferError.code !== 40060) {
+                return; // Can't proceed if we can't defer for other reasons
+            }
         }
 
         try {

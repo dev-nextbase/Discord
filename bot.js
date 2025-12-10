@@ -35,7 +35,7 @@ for (const file of commandFiles) {
     }
 }
 
-client.once('ready', () => {
+client.once('clientReady', () => {
     logger.success(`Bot is online as ${client.user.tag}!`);
     logger.info(`Serving ${client.guilds.cache.size} guild(s)`);
 });
