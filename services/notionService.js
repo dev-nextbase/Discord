@@ -332,12 +332,21 @@ async function getTaskReportByUser(userId, startDate, endDate) {
         let workingTasks = 0;
         let onHoldTasks = 0;
 
+        // Task lists for detailed view
+        const doneTasks = [];
+        const remainingTasksList = [];
+        const assignedTasksList = [];
+
         tasks.forEach(task => {
             const assignedToId = task.properties['Assigned To ID']?.rich_text[0]?.text?.content;
             const assignedById = task.properties['Assigned By ID']?.rich_text[0]?.text?.content;
             const status = task.properties['Status']?.select?.name;
             const doneDate = task.properties['Done Working On']?.date?.start;
             const createdDate = new Date(task.created_time);
+            const taskName = task.properties.Task?.title[0]?.text?.content || 'Untitled';
+            const priority = task.properties.Priority?.select?.name || 'Medium';
+            const discordUrl = task.properties['Discord Thread']?.url || null;
+            const assignedTo = task.properties['Assigned To']?.rich_text[0]?.text?.content || 'Unknown';
 
             // Check if task was created in the date range
             const isInDateRange = createdDate >= startDate && createdDate <= endDate;
@@ -352,11 +361,23 @@ async function getTaskReportByUser(userId, startDate, endDate) {
                         const completedDate = new Date(doneDate);
                         if (completedDate >= startDate && completedDate <= endDate) {
                             completedTasks++;
+                            doneTasks.push({
+                                name: taskName,
+                                priority,
+                                discordUrl,
+                                completedDate: completedDate.toISOString(),
+                            });
                         }
                     }
                 } else {
                     // Remaining tasks (not done)
                     remainingTasks++;
+                    remainingTasksList.push({
+                        name: taskName,
+                        priority,
+                        status,
+                        discordUrl,
+                    });
 
                     if (status === 'Working') {
                         workingTasks++;
@@ -369,6 +390,13 @@ async function getTaskReportByUser(userId, startDate, endDate) {
             // Tasks assigned BY this user (to others)
             if (assignedById === userId && assignedToId !== userId && isInDateRange) {
                 assignedTasks++;
+                assignedTasksList.push({
+                    name: taskName,
+                    priority,
+                    status,
+                    assignedTo,
+                    discordUrl,
+                });
             }
         });
 
@@ -379,6 +407,9 @@ async function getTaskReportByUser(userId, startDate, endDate) {
             totalReceived,
             workingTasks,
             onHoldTasks,
+            doneTasks,
+            remainingTasksList,
+            assignedTasksList,
         };
     } catch (error) {
         logger.error('Error fetching task report', error);

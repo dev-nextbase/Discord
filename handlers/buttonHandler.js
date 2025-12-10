@@ -17,6 +17,20 @@ async function handleButtonInteraction(interaction) {
         const [action, taskId] = interaction.customId.split('_');
         logger.info(`Button clicked: ${action} for task ${taskId}`);
 
+        // Handle report buttons
+        if (action === 'report') {
+            const reportCommand = require('../commands/report');
+            const handled = await reportCommand.handleButton(interaction);
+            if (handled) return;
+        }
+
+        // Handle report pagination
+        if (action === 'reportpage') {
+            const reportCommand = require('../commands/report');
+            const handled = await reportCommand.handlePagination(interaction);
+            if (handled) return;
+        }
+
         // Handle reassign button separately
         if (action === 'reassign') {
             await handleReassignButton(interaction, taskId);

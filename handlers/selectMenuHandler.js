@@ -301,6 +301,19 @@ async function handleMoveToBacklog(interaction, taskId) {
             return;
         }
 
+        // Check if user is team lead or admin (same permission as reassignment)
+        const roleManager = require('../services/roleManagerNotion');
+        const isTeamLead = await roleManager.isTeamLead(interaction.user.id, teamName);
+        const isAdmin = await roleManager.isAdmin(interaction.user.id);
+        const isOwner = interaction.guild.ownerId === interaction.user.id;
+
+        if (!isTeamLead && !isAdmin && !isOwner) {
+            await interaction.editReply({
+                content: '❌ Only team leads can move tasks to backlog',
+            });
+            return;
+        }
+
         // Clear assignee in Notion (move to backlog)
         await reassignTask(taskId, '', ''); // Empty assignee = backlog
 
