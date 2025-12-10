@@ -3,22 +3,20 @@
  * 
  * 1. Reads schema from OLD Database
  * 2. Applies schema to NEW Database
- * 
- * OLD DB: 2b50f280d6d5804fb172e8b5dca3f105
- * NEW DB: 2c45757ae609807889e9f75f302e4f78
  */
 
+require('dotenv').config();
 const { Client } = require('@notionhq/client');
 
 // Configuration
 const SOURCE = {
-    auth: 'ntn_K40685298778l12Mp97MiTFJJe1yVAWwhMg3i3O0LCMfTH', // User provided key
-    databaseId: '2b50f280d6d5804fb172e8b5dca3f105'
+    auth: process.env.NOTION_API_KEY_OLD || process.env.NOTION_API_KEY,
+    databaseId: process.env.NOTION_DATABASE_ID_OLD || '2b50f280d6d5804fb172e8b5dca3f105'
 };
 
 const TARGET = {
-    auth: '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',
-    databaseId: '2c45757ae609807889e9f75f302e4f78'
+    auth: process.env.NOTION_API_KEY,
+    databaseId: process.env.NOTION_DATABASE_ID
 };
 
 const sourceClient = new Client({ auth: SOURCE.auth });

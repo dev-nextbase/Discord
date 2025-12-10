@@ -3,16 +3,15 @@
  * 
  * Adds necessary properties (columns) to the new Notion database
  * to match the structure of the old database.
- * 
- * NEW DB: 2c45757ae609807889e9f75f302e4f78
  */
 
+require('dotenv').config();
 const { Client } = require('@notionhq/client');
 
 // Target Configuration
 const TARGET = {
-    auth: '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',
-    databaseId: '2c45757ae609807889e9f75f302e4f78'
+    auth: process.env.NOTION_API_KEY,
+    databaseId: process.env.NOTION_DATABASE_ID
 };
 
 const notion = new Client({ auth: TARGET.auth });
